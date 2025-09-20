@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互动视频播放器 - 九色鹿</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .video-container {
+            position: relative;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .interaction-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .choice-panel {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transform: translateY(-20px);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(-20px);
+            }
+        }
+
+        .question {
+            font-size: 20px;
+            margin-bottom: 25px;
+            line-height: 1.4;
+            font-weight: bold;
+        }
+
+        .choices {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .choice-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .choice-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-2px);
+        }
+
+        .choice-btn.correct {
+            background: rgba(46, 204, 113, 0.8);
+            border-color: #2ecc71;
+        }
+
+        .choice-btn.incorrect {
+            background: rgba(231, 76, 60, 0.8);
+            border-color: #e74c3c;
+        }
+
+        .feedback {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .feedback.correct {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+            border: 1px solid #2ecc71;
+        }
+
+        .feedback.incorrect {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+
+        .continue-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+            display: none;
+            transition: background 0.3s ease;
+        }
+
+        .continue-btn:hover {
+            background: #2980b9;
+        }
+
+        .progress-indicator {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <video id="interactiveVideo" controls>
+            <source src="C:\Users\32653\Desktop\0c20540c6587b368332b731bac3fd4e8.mp4" type="video/mp4">
+            您的浏览器不支持视频播放。
+        </video>
+        
+        <div class="interaction-overlay" id="interactionOverlay">
+            <div class="choice-panel">
+                <div class="progress-indicator" id="progressIndicator"></div>
+                <div class="question" id="questionText"></div>
+                <div class="choices" id="choicesContainer"></div>
+                <div class="feedback" id="feedback"></div>
+                <button class="continue-btn" id="continueBtn">继续播放</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class InteractiveVideo {
+            constructor() {
+                this.video = document.getElementById('interactiveVideo');
+                this.overlay = document.getElementById('interactionOverlay');
+                this.questionText = document.getElementById('questionText');
+                this.choicesContainer = document.getElementById('choicesContainer');
+                this.feedback = document.getElementById('feedback');
+                this.continueBtn = document.getElementById('continueBtn');
+                this.progressIndicator = document.getElementById('progressIndicator');
+                
+                // 互动点设置 - 按照你的时间要求调整
+                this.interactions = [
+                    {
+                        time: 24, // 第一个互动点：24秒
+                        question: "在商队伙计要摔得粉身碎骨的时候，九色鹿会救他吗？",
+                        choices: [
+                            { text: "会", correct: true },
+                            { text: "不会", correct: false }
+                        ],
+                        correctFeedback: "正确！九色鹿心地善良，见到有人遇险一定会出手相救。",
+                        incorrectFeedback: "不对哦，九色鹿是慈悲善良的，不会见死不救。"
+                    },
+                    {
+                        time: 66, // 第二个互动点：1分06秒
+                        question: "在那个看到九色鹿悬赏的时候，他会去告诉国王吗？",
+                        choices: [
+                            { text: "会", correct: false },
+                            { text: "不会", correct: true }
+                        ],
+                        correctFeedback: "正确！有良知的人不会背叛救命恩人。",
+                        incorrectFeedback: "其实他应该不会背叛救过自己的九色鹿才对。"
+                    },
+                    {
+                        time: 99, // 第三个互动点：1分39秒
+                        question: "九色鹿还会救他吗？",
+                        choices: [
+                            { text: "会", correct: true },
+                            { text: "不会", correct: false }
+                        ],
+                        correctFeedback: "正确！九色鹿即使被背叛，本性依然善良，不会见死不救。",
+                        incorrectFeedback: "虽然被背叛了，但九色鹿本性善良，还是会救人的。"
+                    }
+                ];
+                
+                this.currentInteractionIndex = 0;
+                this.init();
+            }
+            
+            init() {
+                this.video.addEventListener('timeupdate', () => {
+                    this.checkForInteractions();
+                });
+                
+                this.continueBtn.addEventListener('click', () => {
+                    this.continueVideo();
+                });
+            }
+            
+            checkForInteractions() {
+                const currentTime = this.video.currentTime;
+                
+                if (this.currentInteractionIndex < this.interactions.length) {
+                    const nextInteraction = this.interactions[this.currentInteractionIndex];
+                    
+                    if (currentTime >= nextInteraction.time && !this.video.paused) {
+                        this.showInteraction(nextInteraction);
+                    }
+                }
+            }
+            
+            showInteraction(interaction) {
+                this.video.pause();
+                this.questionText.textContent = interaction.question;
+                
+                // 显示进度指示器
+                this.progressIndicator.textContent = `${this.currentInteractionIndex + 1} / ${this.interactions.length}`;
+                
+                // 清空之前的选择
+                this.choicesContainer.innerHTML = '';
+                this.feedback.style.display = 'none';
+                this.continueBtn.style.display = 'none';
+                
+                // 创建选择按钮
+                interaction.choices.forEach((choice, index) => {
+                    const button = document.createElement('button');
+                    button.className = 'choice-btn';
+                    button.textContent = choice.text;
+                    button.addEventListener('click', () => {
+                        this.handleChoice(choice, interaction, button);
+                    });
+                    this.choicesContainer.appendChild(button);
+                });
+                
+                this.overlay.style.display = 'flex';
+            }
+            
+            handleChoice(selectedChoice, interaction, selectedButton) {
+                // 禁用所有按钮
+                const allButtons = this.choicesContainer.querySelectorAll('.choice-btn');
+                allButtons.forEach(btn => {
+                    btn.disabled = true;
+                    if (btn === selectedButton) {
+                        if (selectedChoice.correct) {
+                            btn.classList.add('correct');
+                        } else {
+                            btn.classList.add('incorrect');
+                        }
+                    }
+                });
+                
+                // 显示反馈
+                this.feedback.textContent = selectedChoice.correct ? 
+                    interaction.correctFeedback : interaction.incorrectFeedback;
+                this.feedback.className = selectedChoice.correct ? 
+                    'feedback correct' : 'feedback incorrect';
+                this.feedback.style.display = 'block';
+                
+                // 显示继续按钮
+                this.continueBtn.style.display = 'inline-block';
+            }
+            
+            continueVideo() {
+                this.overlay.style.display = 'none';
+                this.currentInteractionIndex++;
+                
+                // 检查是否是最后一个互动点
+                if (this.currentInteractionIndex >= this.interactions.length) {
+                    console.log('所有互动点完成！');
+                }
+                
+                this.video.play();
+            }
+        }
+        
+        // 等待页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            new InteractiveVideo();
+        });
+    </script>
+</body>
+</html>
